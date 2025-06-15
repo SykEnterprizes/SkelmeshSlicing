@@ -117,7 +117,7 @@ void ULimbExtractorTool::LoggingAndDebugSwitches(bool ShowLoops, bool MeshDiagno
 // The only called function in BP - does all the mesh generating and capping
 void ULimbExtractorTool::ExtractBoneToStaticMesh(USkeletalMesh* SkeletalMesh, FName BoneName)
 {
-#pragma region generate limb mesh data
+#pragma region Create Skel Mesh
 
 	if (!SkeletalMesh || BoneName.IsNone()) return;
 
@@ -144,6 +144,7 @@ void ULimbExtractorTool::ExtractBoneToStaticMesh(USkeletalMesh* SkeletalMesh, FN
 
 		TArray<int32> OutIndicies;
 		TMap<int32, int32> BoneReMap;
+		// gets the bone indices associated with the Desired Bone Names children
 		GetBoneHierachy(SkeletalMesh, BoneName, ExclBones,  OutIndicies);
 		
 		// Extract the whole bone chain, or a selection of it if specified
@@ -154,10 +155,8 @@ void ULimbExtractorTool::ExtractBoneToStaticMesh(USkeletalMesh* SkeletalMesh, FN
 			ExtractBoneVertices(SkeletalMesh, DesiredBone, FinalVertices, FinalVertexIndices, MinimumWeight /*= 128*/, SelectedVertices);
 		}
 		
-		//CreateSkeletalLimbData(SkeletalMesh, OutLimbSkelMesh, OutIndicies, BoneReMap);
 		BuildExtractedMeshData(SkeletalMesh, FinalVertexIndices, FinalVertices, FinalUVs, FinalNormals, FinalColors, FinalTangents, OldToNewVertexMap, IntVecTriangles, Skin, Sync);
 		BuildTriangleIndices(SkeletalMesh, SelectedVertices, OldToNewVertexMap, FinalTriangles, MaterialIndices);
-		//ExpandBoneRemapToMatchSkinWeights(SkeletalMesh, BoneReMap, Skin);
 
 //  Step 3: Gather all used skin weight bone indices
 		TSet<int32> SkinWeightBoneIndicesUsed;
@@ -172,7 +171,6 @@ void ULimbExtractorTool::ExtractBoneToStaticMesh(USkeletalMesh* SkeletalMesh, FN
 			}
 		}
 
-		//  Step 4: Create skeleton while expanding BoneRemap at the same time
 		CreateSkeletalLimbData(SkeletalMesh, OutLimbSkelMesh, OutIndicies, BoneReMap, SkinWeightBoneIndicesUsed);
 
 		ValidateVertexToSkinWeightMapping(SkeletalMesh, FinalVertices, Skin, Sync);
@@ -184,8 +182,10 @@ void ULimbExtractorTool::ExtractBoneToStaticMesh(USkeletalMesh* SkeletalMesh, FN
 	
 		return;
 	}
-	
-		// Extract the bone vertices from the mesh associated with the bone its skinned to
+#pragma endregion
+#pragma region Static Mesh creation
+	// If we are only extracting a static mesh, then this section does the extraction and capping --
+		// Extract the bone vertices from the mesh associated with the bone its skinned to ***** add loop to include bonechains  ***********
 		ExtractBoneVertices(SkeletalMesh, BoneName, FinalVertices, FinalVertexIndices, MinimumWeight /*= 128*/, SelectedVertices);
 
 	
@@ -196,7 +196,7 @@ void ULimbExtractorTool::ExtractBoneToStaticMesh(USkeletalMesh* SkeletalMesh, FN
 	BuildTriangleIndices(SkeletalMesh, SelectedVertices, OldToNewVertexMap, FinalTriangles, MaterialIndices);
 
 	
-#pragma endregion
+
 
 #pragma region Clean the mesh data
 
@@ -446,6 +446,9 @@ void ULimbExtractorTool::ExtractBoneToStaticMesh(USkeletalMesh* SkeletalMesh, FN
 		
 #pragma endregion
 		// all done
+	}
+
+#pragma endregion
 }
 
 
@@ -1084,11 +1087,11 @@ void ULimbExtractorTool::ValidateVertexToSkinWeightMapping(
 
 	if (ErrorCount == 0)
 	{
-		UE_LOG(LogTemp, Display, TEXT("? Validation passed — vertex positions and skin weights match original mesh."));
+		UE_LOG(LogTemp, Display, TEXT("? Validation passed Â— vertex positions and skin weights match original mesh."));
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("? Validation failed — %d mismatch(es) detected."), ErrorCount);
+		UE_LOG(LogTemp, Error, TEXT("? Validation failed Â— %d mismatch(es) detected."), ErrorCount);
 	}
 }
 
@@ -1122,7 +1125,7 @@ void ULimbExtractorTool::ValidateInfluenceBoneMapping(
 		}
 	}
 
-	UE_LOG(LogTemp, Display, TEXT("? Validation complete — %d unique bones used"), UsedBones.Num());
+	UE_LOG(LogTemp, Display, TEXT("? Validation complete Â— %d unique bones used"), UsedBones.Num());
 }
 
 void ULimbExtractorTool::ExpandBoneRemapToMatchSkinWeights(
@@ -1974,7 +1977,7 @@ FVector3f ULimbExtractorTool::ComputeLoopNormalWithTolerance(const TArray<FVecto
 		Center += V;
 	Center /= LoopVerts.Num();
 
-	// Step 2: Estimate rough normal using Newell’s method
+	// Step 2: Estimate rough normal using NewellÂ’s method
 	FVector3f RoughNormal(0);
 	for (int32 i = 0; i < LoopVerts.Num(); ++i)
 	{
