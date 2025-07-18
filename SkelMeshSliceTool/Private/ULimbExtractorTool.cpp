@@ -1284,18 +1284,8 @@ void ULimbExtractorTool::CreateSkeletalMesh(USkeletalMesh* SkeletalMesh,FName Bo
 				TArray<int32> FadeRingLoop;
 				TArray<int32> FadeRingTriangles;
 
-				GenerateFadeRingCapFromLoop(
-					LoopPositions,
-					CapVertices,
-					FadeTriangles,
-					CapUVs,
-					LoopUVs,
-					CapNormals,
-					BP_FadeRingLength,
-					FadeRingLoop,
-					FadeRingTriangles,
-					BP_AddNoise,
-					BP_NoiseAmount);
+				//GenerateFadeRingCapFromLoopInfo(LoopInfo, CapVertices, FadeTriangles, CapUVs, CapNormals, FadeRingLoop, FadeRingTriangles);
+
 
 				MaterialToTriangles.FindOrAdd(LoopMaterialIndex).Append(FadeRingTriangles);
 				FadeRings.Add(FadeRingLoop);
@@ -1976,7 +1966,10 @@ void ULimbExtractorTool::FillCapBuffers(const TArray<FVector3f>& SourceVerts,con
 // our main cappinng function that creates the fade ring and cap mesh
 void ULimbExtractorTool::CreateFadeRingAndCap(FEdgeLoopInfo LoopInfo, FEdgeLoopInfo& UpdatedInfo)
 {
-	
+	BP_UVScale = LoopInfo.UV_Scale;
+	BP_UVRotationDegrees = LoopInfo.UV_Rotation;
+	BP_UVOffset = FVector2D(LoopInfo.UV_Offset_X, LoopInfo.UV_Offset_Y);
+
 	UE_LOG(LogTemp, Warning, TEXT("Create Cap Running, loopInfo #%d"), LoopInfo.LoopNumber);
 	// Destroy old mesh if it exists
 	if (CapComponents.Contains(LoopInfo.LoopNumber))
@@ -2225,190 +2218,6 @@ void ULimbExtractorTool::CreateFadeRingAndCap(FEdgeLoopInfo LoopInfo, FEdgeLoopI
 	Wrapper.EdgeLoops.Empty();
 #pragma endregion
 	// all done
-}
-
-void ULimbExtractorTool::CreateFadeRingsAndCaps(USkeletalMesh* Mesh)
-{
-		////////////////////////////////////////////////////////////////////////////////////////////
-		// Create cap vertex data and merge it with 
-		TArray<FVector3f> CapVertices;
-		TArray<int32> CapTriangles;
-		TArray<int32> FadeTriangles;
-		TArray<FVector> CapNormals;
-		TArray<FVector2D> CapUVs;
-		TArray<FLinearColor> CapColors;
-		TArray<FProcMeshTangent> CapTangents;
-		TArray<TArray<FVector3f>> FoundEdgeLoops;
-		TArray<TArray<FVector3f>> DomeEdgeLoops;
-		TMap<int32, TArray<int32>> MaterialToTriangles;
-		TArray<TArray<int32>> FadeRings;
-
-		for (const FEdgeLoopInfo Info : EdgeLoopInfos)
-		{
-			TArray<FVector3f> LoopPositions;
-			TArray<FVector2D> LoopUVs;
-
-			for (int32 Index : Info.VertexIndices)
-			{
-				if (CachedMeshContext.FinalVertices.IsValidIndex(Index))
-				{
-					LoopPositions.Add(CachedMeshContext.FinalVertices[Index]);
-					LoopUVs.Add(CachedMeshContext.FinalUVs[Index]); // aligns positions and UVs
-				}
-			}
-
-			int32 LoopMaterialIndex = InferLoopMaterialFromPositions(LoopPositions, CachedMeshContext.FinalTriangles, CachedMeshContext.FinalVertices, CachedMeshContext.FinalMaterialIndices, 0.001f);
-
-			TArray<int32> FadeRingLoop;
-			TArray<int32> FadeRingTriangles;
-
-			GenerateFadeRingCapFromLoop(
-				LoopPositions,
-				CapVertices,
-				FadeTriangles,
-				CapUVs,
-				LoopUVs,
-				CapNormals,
-				BP_FadeRingLength,
-				FadeRingLoop,
-				FadeRingTriangles,
-				BP_AddNoise,
-				BP_NoiseAmount);
-
-			MaterialToTriangles.FindOrAdd(LoopMaterialIndex).Append(FadeRingTriangles);
-
-			FadeRings.Add(FadeRingLoop);
-			// we take our output fadering and add it to the capverts needed to pass to the dome generator to build off
-			// - these verts are added to finalverts inside generatefadering, but we check anyway to avoid an accidental out of bounds
-			for (int32 Index : FadeRingLoop)
-			{
-				// check to make sure the fadering edge loop vert is in finalvertices 
-				if (CachedMeshContext.FinalVertices.IsValidIndex(Index))
-				{
-					// add it to the capverts 
-					CapVertices.Add(CachedMeshContext.FinalVertices[Index]);
-					CapUVs.Add(CachedMeshContext.FinalUVs[Index]);
-					CapNormals.Add(FVector(1, 0, 0));
-					CapColors.Add(FColor::Red);
-					CapTangents.Add(FProcMeshTangent(1, 0, 0));
-
-				}
-			}
-
-		}
-		for (const TArray<int32> Ring : FadeRings)
-		{
-			TArray<FVector3f> RingVerts;
-			for (int32 Index : Ring)
-			{
-				RingVerts.Add(CapVertices[Index]);
-			}
-			DomeEdgeLoops.Add(RingVerts); // -  input for dome generation
-			//UE_LOG(LogTemp, Warning, TEXT("FadeEdgeLoops = %d"), DomeEdgeLoops.Num());
-		}
-
-		// finally generate the vertices data we want to give to create mesh section
-		if (AddDome)
-		{
-			for (const TArray<FVector3f>& Loop1 : DomeEdgeLoops)
-			{
-				GenerateDomedCapFromLoop(Loop1, CapVertices, CapTriangles, CapUVs, CapNormals, BP_DomeHieght, BP_NoiseAmount, BP_RingCount, BP_AddNoise);
-				UE_LOG(LogTemp, Warning, TEXT("generate dome called "))
-			}
-		}
-		else
-		{
-			for (const TArray<FVector3f>& Loop1 : DomeEdgeLoops)
-			{
-				GenerateCapFanFromLoop(Loop1, CachedMeshContext.FinalVertices, CapVertices, CapTriangles, CapUVs, CapNormals);
-			}
-
-		}
-
-		if (ShowLoopDebug)
-		{
-			DrawEdgeLoopsDebug(DomeEdgeLoops, CachedMeshContext.FinalVertices, GetWorld(), PreviewMesh->GetComponentTransform(), 20, .4);
-		}
-
-#pragma endregion
-
-#pragma region fill CapBuffers and generate uv data
-
-		// Prepare buffers
-		TArray<FVector> CapVerts;
-
-		for (int32 i = 0; i < CapVertices.Num(); ++i)
-		{
-			CapVerts.Add(FVector(CapVertices[i]));
-			CapNormals.Add(FVector(1, 0, 0)); // Placeholder normal
-			// generated in our dome generator
-			//CapUVs.Add(FVector2D(0.5f, 0.5f));
-			CapColors.Add(FLinearColor::Red);
-			CapTangents.Add(FProcMeshTangent(1, 0, 0));
-
-		}
-
-#pragma endregion
-
-		// WE MUST HAVE FILLED ARRAYS FROM PREVIOUS CODE FOR CAPVERTS, CAPTRIANGLES, and the others
-# pragma region create capmesh for PreviewMesh
-		// --- CREATE THE MESH ---
-		UProceduralMeshComponent* CapMesh = NewObject<UProceduralMeshComponent>(OwnerActor);
-
-		CapMesh->RegisterComponentWithWorld(GetWorld());
-		CapMesh->AttachToComponent(PreviewMesh, FAttachmentTransformRules::KeepRelativeTransform);
-		CapMesh->SetWorldLocation(PreviewMesh->GetComponentLocation());
-		CapMesh->bUseComplexAsSimpleCollision = true;
-		CapMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		CapMesh->SetVisibility(true);
-
-
-		int32 SectionIndex = 0;
-
-		// 1. Add all Fade Ring triangles (with inherited materials)
-		for (const TPair<int32, TArray<int32>>& Pair : MaterialToTriangles)
-		{
-			int32 MaterialIndex = Pair.Key;
-			const TArray<int32>& SectionTris = Pair.Value;
-
-			CapMesh->CreateMeshSection_LinearColor(
-				SectionIndex,
-				CapVerts,
-				SectionTris,
-				CapNormals,
-				CapUVs,
-				CapColors,
-				CapTangents,
-				true
-			);
-
-			if (Mesh->GetMaterials().IsValidIndex(MaterialIndex))
-			{
-				CapMesh->SetMaterial(SectionIndex, Mesh->GetMaterials()[MaterialIndex].MaterialInterface);
-			}
-
-			++SectionIndex;
-		}
-
-		// 2. Add dome geometry (gore section)
-		if (BP_CapMaterial && CapTriangles.Num() > 0)
-		{
-			CapMesh->CreateMeshSection_LinearColor(
-				SectionIndex,
-				CapVerts,
-				CapTriangles,
-				CapNormals,
-				CapUVs,
-				CapColors,
-				CapTangents,
-				true
-			);
-
-			CapMesh->SetMaterial(SectionIndex, BP_CapMaterial.Get());
-		}
-
-#pragma endregion
-		// all done
 }
 
 // The new  buffer filler for the skelmesh 
@@ -2845,11 +2654,7 @@ void ULimbExtractorTool::AddMaterialSectionToProceduralMesh(UProceduralMeshCompo
 }
 
 // so we can separate out multi meshes and their material mappings 
-void ULimbExtractorTool::GenerateMaterialToTrianglesMap(
-const TArray<int32>& MaterialIndices,
-const TArray<int32>& FinalTriangles,
-TMap<int32, TArray<int32>>& OutMaterialToTriangles
-)
+void ULimbExtractorTool::GenerateMaterialToTrianglesMap(const TArray<int32>& MaterialIndices,const TArray<int32>& FinalTriangles,TMap<int32, TArray<int32>>& OutMaterialToTriangles)
 {
 	OutMaterialToTriangles.Reset();
 
@@ -3058,20 +2863,22 @@ void ULimbExtractorTool::GenerateCapFanFromLoop(
 	TArray<FVector>& CapNormals
 )
 {
-	TArray<FVector3f> LoopPositions = Loop;
+	if (Loop.Num() < 3) return;
+
+	int32 CapVertStart = CapVertices.Num();
 
 	// Compute center
 	FVector3f Center(0);
-	for (const FVector3f& V : LoopPositions)
+	for (const FVector3f& V : Loop)
 		Center += V;
-	Center /= LoopPositions.Num();
+	Center /= Loop.Num();
 
 	// Newell's method for best-fit normal
 	FVector3f Normal(0);
-	for (int32 i = 0; i < LoopPositions.Num(); ++i)
+	for (int32 i = 0; i < Loop.Num(); ++i)
 	{
-		const FVector3f& Current = LoopPositions[i];
-		const FVector3f& Next = LoopPositions[(i + 1) % LoopPositions.Num()];
+		const FVector3f& Current = Loop[i];
+		const FVector3f& Next = Loop[(i + 1) % Loop.Num()];
 		Normal.X += (Current.Y - Next.Y) * (Current.Z + Next.Z);
 		Normal.Y += (Current.Z - Next.Z) * (Current.X + Next.X);
 		Normal.Z += (Current.X - Next.X) * (Current.Y + Next.Y);
@@ -3079,19 +2886,17 @@ void ULimbExtractorTool::GenerateCapFanFromLoop(
 	Normal = Normal.GetSafeNormal();
 
 	// Add center vertex
-	int32 CenterIndex = CapVertices.Num();
-	CapVertices.Add(Center);
+	int32 CenterIndex = CapVertices.Add(Center);
 	CapUVs.Add(FVector2D(0.5f, 0.5f)); // placeholder
 	CapNormals.Add(FVector(Normal));
 
-	// Add outer ring vertices
+	// Add outer ring
 	TArray<int32> RingIndices;
-	for (const FVector3f& Pos : LoopPositions)
+	for (const FVector3f& Pos : Loop)
 	{
-		CapVertices.Add(Pos);
+		RingIndices.Add(CapVertices.Add(Pos));
 		CapUVs.Add(FVector2D(0.5f, 0.5f)); // placeholder
 		CapNormals.Add(FVector(Normal));
-		RingIndices.Add(CapVertices.Num() - 1);
 	}
 
 	// Build triangle fan
@@ -3099,10 +2904,31 @@ void ULimbExtractorTool::GenerateCapFanFromLoop(
 	{
 		int32 A = RingIndices[i];
 		int32 B = RingIndices[(i + 1) % RingIndices.Num()];
-		CapTriangles.Add(CenterIndex);
+		/*CapTriangles.Add(CenterIndex);
 		CapTriangles.Add(B); // flipped winding
+		CapTriangles.Add(A);*/
+		CapTriangles.Add(CenterIndex);
 		CapTriangles.Add(A);
+		CapTriangles.Add(B);
+
 	}
+
+	int32 CapVertEnd = CapVertices.Num();
+	int32 CapVertCount = CapVertEnd - CapVertStart;
+
+	// ✅ Apply UV projection using scoped values
+	ProjectPlanarUVsForCap(
+		CapVertices,
+		CapVertStart,
+		CapVertCount,
+		Center,
+		Normal,
+		CapUVs,
+		FVector2D(BP_UVScale, BP_UVScale),
+		BP_UVRotationDegrees,
+		BP_UVOffset
+	);
+
 }
 //  generates an adjustable gore cap off an edge loop
 void ULimbExtractorTool::GenerateDomedCapFromLoop(const TArray<FVector3f>& LoopVerts,TArray<FVector3f>& OutVertices,TArray<int32>& OutTriangles,TArray<FVector2D>& OutUVs,TArray<FVector>& OutNormals,float DomeHeight,float NoiseAmount,int32 RingCount,bool bApplyNoise)
@@ -3221,112 +3047,6 @@ int32 DomeVertCount = DomeVertEnd - DomeVertStart;
 }
 
 // creates a 'fadering' which is basically an adjustable length mesh that fills in any rough gaps, to give us a smooth clean edgeloop to build a gore-cap on 
-void ULimbExtractorTool::GenerateFadeRingCapFromLoop(const TArray<FVector3f>& BaseLoopPositions,TArray<FVector3f>& OutVertices,TArray<int32>& OutTriangles,TArray<FVector2D>& OutUVs, const TArray<FVector2D> InputUVs,TArray<FVector>& OutNormals,float OffsetDistance,TArray<int32>& OutFadeRingIndices, TArray<int32>& OutFadeRingTriangles, bool bApplyNoise, float NoiseAmount)
-{
-	
-	if (BaseLoopPositions.Num() < 3) return;
-	
-	
-	const int32 LoopSize = BaseLoopPositions.Num();
-	OutFadeRingIndices.Reset();
-
-	// --- Step 1: Compute loop center and normal (same as dome)
-	FVector3f Center(0);
-	for (const FVector3f& V : BaseLoopPositions)
-		Center += V;
-	Center /= LoopSize;
-
-	FVector3f Normal = ComputeLoopNormalWithTolerance(BaseLoopPositions, 1.5f);
-	// Estimate limb direction from two opposite loop points
-	FVector3f P0 = BaseLoopPositions[0];
-	FVector3f P1 = BaseLoopPositions[BaseLoopPositions.Num() / 2];
-	FVector3f LimbAxis = (P1 - P0).GetSafeNormal(); // approximate bone axis
-
-	// Build a stable tangent from loop
-	FVector3f Tangent = (BaseLoopPositions[1] - P0).GetSafeNormal();
-
-	// Construct a normal perpendicular to the axis
-	FVector3f SliceNormal = FVector3f::CrossProduct(LimbAxis, Tangent).GetSafeNormal() * -1;
-
-	// --- Step 2: Estimate average radius of loop
-	float AvgRadius = 0.f;
-	for (const FVector3f& V : BaseLoopPositions)
-		AvgRadius += FVector3f::Dist(V, Center);
-	AvgRadius /= LoopSize;
-
-	float Radius = AvgRadius * .95;// FadeRingRadiusMultiplier;
-
-	// --- Step 3: Add base ring verts
-	TArray<int32> BaseRing;
-
-	for (int32 i = 0; i < BaseLoopPositions.Num(); ++i)
-	{
-		int32 Idx = OutVertices.Add(BaseLoopPositions[i]);
-		OutUVs.Add(InputUVs[i]);  // Direct UV inheritance
-		OutNormals.Add(FVector(SliceNormal));
-		BaseRing.Add(Idx);
-	}
-
-
-	// --- Step 4: Build tangent basis to avoid spiral artifacts
-	FVector3f X = (BaseLoopPositions[0] - Center).GetSafeNormal();
-	FVector3f Y = FVector3f::CrossProduct(SliceNormal/*Normal*/, X).GetSafeNormal();
-
-	// --- Step 5: Create circular fade ring in plane of base loop
-	for (int32 i = 0; i < LoopSize; ++i)
-	{
-		float Angle = (float(i) / LoopSize) * 2.f * PI;
-		FVector3f Offset = Radius * (FMath::Cos(Angle) * X + FMath::Sin(Angle) * Y);
-		FVector3f Pos = Center + Offset;
-		
-		if (bApplyNoise)
-		{
-			float Noise = FMath::FRandRange(-NoiseAmount, NoiseAmount);
-			Pos += Normal * Noise;
-		}
-
-		int32 FadeIdx = OutVertices.Add(Pos);
-		//OutUVs.Add(InputUVs[i]);  // ✅ Pixel-precise match
-		
-
-
-		OutNormals.Add(FVector(/*Normal*/SliceNormal));
-		OutFadeRingIndices.Add(FadeIdx);
-	}
-	FVector3f PushDir = /*Normal*/SliceNormal * OffsetDistance; // DesiredOffset could be small, like 1.0f
-	for (int32 Index : OutFadeRingIndices)
-	{
-		OutVertices[Index] += PushDir;
-	}
-
-
-
-	// --- Step 5: Stitch base ring to fade ring
-	for (int32 i = 0; i < LoopSize; ++i)
-	{
-		int32 A = BaseRing[i];
-		int32 B = BaseRing[(i + 1) % LoopSize];
-		int32 C = OutFadeRingIndices[i];
-		int32 D = OutFadeRingIndices[(i + 1) % LoopSize];
-
-		int32 T0[3] = { A, D, C };
-		int32 T1[3] = { A, B, D };
-
-		for (int32 j = 0; j < 3; ++j)
-		{
-			OutTriangles.Add(T0[j]);
-			OutFadeRingTriangles.Add(T0[j]);
-		}
-		for (int32 j = 0; j < 3; ++j)
-		{
-			OutTriangles.Add(T1[j]);
-			OutFadeRingTriangles.Add(T1[j]);
-		}
-
-	}
-	
-}
-
 void ULimbExtractorTool::GenerateFadeRingCapFromLoopInfo(
 	const FEdgeLoopInfo& LoopInfo,
 	TArray<FVector3f>& OutVertices,
@@ -3480,69 +3200,6 @@ void ULimbExtractorTool::GenerateFadeRingCapFromLoopInfo(
 			continue;
 		}
 
-		/*/if (i == LoopSize - 1)
-		{
-			FVector3f PosE = OutVertices[BaseRing[i]];
-			FVector3f PosF = OutVertices[BaseRing[0]];
-			FVector3f PosG = OutVertices[OutFadeRingIndices[i]];
-			FVector3f PosH = OutVertices[OutFadeRingIndices[0]];
-
-			FVector2D SeamUV = OutUVs[BaseRing[0]];
-			FVector Normal2 = OutNormals[BaseRing[0]];
-
-			int32 NewE = OutVertices.Add(PosE);
-			int32 NewF = OutVertices.Add(PosF);
-			int32 NewG = OutVertices.Add(PosG);
-			int32 NewH = OutVertices.Add(PosH);
-
-			OutUVs.Add(SeamUV);
-			OutUVs.Add(SeamUV);
-			OutUVs.Add(SeamUV);
-			OutUVs.Add(SeamUV);
-
-			OutNormals.Add(Normal2);
-			OutNormals.Add(Normal2);
-			OutNormals.Add(Normal2);
-			OutNormals.Add(Normal2);
-
-			// 🔍 Check triangle area before adding
-			auto IsDegenerate = [](const FVector3f& A, const FVector3f& B, const FVector3f& C) -> bool
-				{
-					FVector3f AB = B - A;
-					FVector3f AC = C - A;
-					float Area = FVector3f::CrossProduct(AB, AC).Size();
-					return Area < 0.001f;
-				};
-
-			bool T0Valid = !IsDegenerate(PosE, PosH, PosG);
-			bool T1Valid = !IsDegenerate(PosE, PosF, PosH);
-
-			if (T0Valid)
-			{
-				OutTriangles.Add(NewE);
-				OutTriangles.Add(NewH);
-				OutTriangles.Add(NewG);
-				OutFadeRingTriangles.Append({ NewE, NewH, NewG });
-			}
-
-			if (T1Valid)
-			{
-				OutTriangles.Add(NewE);
-				OutTriangles.Add(NewF);
-				OutTriangles.Add(NewH);
-				OutFadeRingTriangles.Append({ NewE, NewF, NewH });
-			}
-
-			UE_LOG(LogTemp, Warning, TEXT("Seam triangle areas: T0=%.6f T1=%.6f"),
-				FVector3f::CrossProduct(PosH - PosE, PosG - PosE).Size(),
-				FVector3f::CrossProduct(PosF - PosE, PosH - PosE).Size());
-
-			continue;
-		}*/
-
-
-
-
 		// Regular stitching for non-seam triangles
 		float Spread0 = FVector2D::Distance(UVA, UVD) + FVector2D::Distance(UVD, UVC) + FVector2D::Distance(UVC, UVA);
 		float Spread1 = FVector2D::Distance(UVA, UVB) + FVector2D::Distance(UVB, UVD) + FVector2D::Distance(UVD, UVA);
@@ -3587,25 +3244,7 @@ void ULimbExtractorTool::GenerateFadeRingCapFromLoopInfo(
 		OutFadeRingTriangles.Add(Tri.Y);
 		OutFadeRingTriangles.Add(Tri.Z);
 	}
-	for (int32 i = 0; i < OutFadeRingTriangles.Num(); i += 3)
-	{
-		int32 A = OutFadeRingTriangles[i];
-		int32 B = OutFadeRingTriangles[i + 1];
-		int32 C = OutFadeRingTriangles[i + 2];
-
-		if (!OutVertices.IsValidIndex(A) || !OutVertices.IsValidIndex(B) || !OutVertices.IsValidIndex(C)) continue;
-
-		FVector3f VA = OutVertices[A];
-		FVector3f VB = OutVertices[B];
-		FVector3f VC = OutVertices[C];
-
-		FVector3f Center2 = (VA + VB + VC) / 3.f;
-		FVector3f Normal3 = FVector3f::CrossProduct(VB - VA, VC - VA).GetSafeNormal();
-
-		DrawDebugLine(GetWorld(), FVector(Center), FVector(Center2 + Normal3 * 20.f), FColor::Blue, false, 10.f);
-	}
-
-	
+		
 }
 
 // takes the edgeloop verts, and filters out ones with extreme distances from the others so a normal is less likely to be skewed
@@ -3686,8 +3325,6 @@ FVector3f ULimbExtractorTool::ComputeLoopNormalWithTolerance(const TArray<FVecto
 	RefinedNormal = RefinedNormal.GetSafeNormal();
 	return RefinedNormal;
 }
-
-
 
 #pragma region logging
 //////////////////////////// LOGGING - VISULAIZERS ////////////////////////////////////////////
