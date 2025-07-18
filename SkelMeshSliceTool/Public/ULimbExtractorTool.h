@@ -175,31 +175,13 @@ public:
     //   Takes our Bone name input and extractc all the weighted vertices associated with it - used during skeletal mesh creation  
     void ExtractSkelMeshVertices(USkeletalMesh* SkeletalMesh,/* const TSet<int32>& TargetBoneIndices*/FName BoneName, TArray<FRawVertexData>& VertexData, float MinimumWeightThreshold);
     
-    void GetBoneHierachy(USkeletalMesh* SkeletalMesh,
-        FName RootBone,
-        const TSet<FName>& ExcludedBones,
-        TArray<int32>& OutSortedBoneIndices);
+    void GetBoneHierachy(USkeletalMesh* SkeletalMesh, FName RootBone, const TSet<FName>& ExcludedBones, TArray<int32>& OutSortedBoneIndices);
 
-    void CreateSkeletalLimbData(USkeletalMesh* SkeletalMesh,
-        USkeletalMesh*& OutLimbMesh,
-        const TArray<int32>& SortedBoneIndices,
-        TMap<int32, int32>& OutBoneRemap, const TSet<int32>& SkinWeightBoneIndicesUsed);
+    void CreateSkeletalLimbData(USkeletalMesh* SkeletalMesh, USkeletalMesh*& OutLimbMesh, const TArray<int32>& SortedBoneIndices, TMap<int32, int32>& OutBoneRemap, const TSet<int32>& SkinWeightBoneIndicesUsed);
 
     FTransform GetAccumulatedTransform(const FReferenceSkeleton& RefSkeleton, int32 BoneIndex);
 
-    void CreateLimbMeshFromExtractedData(
-        USkeletalMesh* SourceMesh,
-        USkeletalMesh*& OutLimbMesh,
-        const TArray<FVector3f>& Vertices,
-        const TArray<FVector2D>& UVs,
-        const TArray<FVector>& Normals,
-        const TArray<FColor>& Colors,
-        const TArray<FVector>& Tangents,
-        const TArray<FIntVector>& Triangles,
-        const TMap<int32, int32>& BoneRemap,
-        const TArray<FSkinWeightInfo>& SkinWeights, 
-        TArray<int32>& OriginalVertexIndices
-        );
+    void CreateLimbMeshFromExtractedData(USkeletalMesh* SourceMesh, USkeletalMesh*& OutLimbMesh, const TArray<FVector3f>& Vertices, const TArray<FVector2D>& UVs, const TArray<FVector>& Normals, const TArray<FColor>& Colors, const TArray<FVector>& Tangents, const TArray<FIntVector>& Triangles, const TMap<int32, int32>& BoneRemap, const TArray<FSkinWeightInfo>& SkinWeights, TArray<int32>& OriginalVertexIndices);
 
     void CreateLimbMeshFromRawVertexData(USkeletalMesh* SourceMesh, USkeletalMesh*& OutLimbMesh, const TArray<FVector3f>& Vertices, const TArray<FVector2D>& UVs, const TArray<FVector>& Normals, const TArray<FColor>& Colors, const TArray<FVector>& Tangents, const TArray<FIntVector>& Triangles,  TArray<FRawVertexData> VertexData, const TMap<int32, int32>& BoneRemap, const TSet<int32>& SkinWeightBoneIndicesUsed);
 
@@ -214,10 +196,6 @@ public:
     void CreateStaticMesh(USkeletalMesh* SkeletalMesh, FName BoneName, bool CreateBoneChain);
 
     void BuildEdgeLoopInfoCache(USkeletalMesh* SkeletalMesh);
-    
-    void PromptNextLoopForCapping(USkeletalMesh* Mesh);
-
-    void RunPromptForLoop(FEdgeLoopInfo& Info, USkeletalMesh* Mesh);
 
     void FillCapBuffers(const TArray<FVector3f>& SourceVerts, const TArray<FVector2D>& SourceUVs, TArray<FVector>& OutVerts, TArray<FVector>& OutNormals, TArray<FVector2D>& OutUVs, TArray<FLinearColor>& OutColors, TArray<FProcMeshTangent>& OutTangents, const FLinearColor& Color);
 
@@ -285,7 +263,10 @@ public:
         const TArray<FVector3f>& Loop,
         const TArray<FVector3f>& FinalVertices,
         TArray<FVector3f>& CapVertices,
-        TArray<int32>& CapTriangles);
+        TArray<int32>& CapTriangles,
+        TArray<FVector2D>& CapUVs,
+        TArray<FVector>& CapNormals
+    );
 
 
     void FindBoundaryLoopsFromTriangles(const TArray<FIntVector>& Triangles, TArray<TArray<int32>>& OutLoops);
@@ -296,7 +277,9 @@ public:
 
     void GenerateFadeRingCapFromLoop(const TArray<FVector3f>& BaseLoopPositions, TArray<FVector3f>& OutVertices, TArray<int32>& OutTriangles, TArray<FVector2D>& OutUVs, const TArray<FVector2D> InputUVs, TArray<FVector>& OutNormals, float OffsetDistance, TArray<int32>& OutFadeRingIndices, TArray<int32>& OutFadeRingTriangles, bool bApplyNoise, float NoiseAmount);
 
-    //////// Cap UV generation /////////
+    void GenerateFadeRingCapFromLoopInfo(const FEdgeLoopInfo& LoopInfo, TArray<FVector3f>& OutVertices, TArray<int32>& OutTriangles, TArray<FVector2D>& OutUVs, TArray<FVector>& OutNormals, TArray<int32>& OutFadeRingIndices, TArray<int32>& OutFadeRingTriangles);
+    
+        //////// Cap UV generation /////////
 
     void ProjectPlanarUVsForCap(
         const TArray<FVector3f>& Vertices,

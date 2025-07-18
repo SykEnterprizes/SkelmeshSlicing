@@ -14,26 +14,35 @@ struct FEdgeLoopInfo
 public:
 
     UPROPERTY(BlueprintReadWrite)
-    TArray<int32> VertexIndices;
+    TArray<int32> VertexIndices;  // vertiex indices are the indices from the output sorted edgeloop array
     UPROPERTY(BlueprintReadWrite)
-    TArray<FVector3f> Positions;
+    TArray<FVector3f> Positions;  // the actual vectors of the vertices
     UPROPERTY(BlueprintReadWrite)
-    int32 VotedMaterialIndex;
+    TArray<FVector2D> UVs;
     UPROPERTY(BlueprintReadWrite)
-    float TotalEdgeLength;
+    int32 VotedMaterialIndex;  // the material index designated from the base mesh
     UPROPERTY(BlueprintReadWrite)
-    bool bShouldCap = false; // toggleable
+    float TotalEdgeLength;  // unused yet.. but maybe good for something later
     UPROPERTY(BlueprintReadWrite)
-    bool bAddFadeRing = false;
+    bool bAddFadeRing = false;  // add a fade ring to help with excessively uneven edgeloops
     UPROPERTY(BlueprintReadWrite)
-    bool bAddDome = false;
+    bool bAddDome = false;  // add a dome shape, or just a fan cap
     UPROPERTY(BlueprintReadWrite)
-    bool bAddNoise = false;
+    bool bAddNoise = false;  // toggles adding noise to the procedural generation
+    UPROPERTY(BlueprintReadWrite) //  This shouldnt be changed since its an identifier, and if we break a struct in bp, unless its filled exactly, will cause issues with other loops
+    int32 LoopNumber = 0;  // an identifier for the loop
+	UPROPERTY(BlueprintReadWrite)
+	float DomeHeight = -2.0f;  // height of the dome, if applicable
+	UPROPERTY(BlueprintReadWrite)
+	float FadeRingHieght = -2.0f;  // hieght of the fadering, if applicable
     UPROPERTY(BlueprintReadWrite)
-    int32 LoopNumber = 0;
-    // didnt want this exposed, but since we make struct data in the cap widget
-    // we need it exposed to make sure we can pass the value to the new struct data
+    int32 RingCount = 2;  // number of rings to add to the fade ring
     UPROPERTY(BlueprintReadWrite)
-    UProceduralMeshComponent* GeneratedCap;
+    float NoiseAmount = 0.1f;  // amount of noise to apply to the cap
+    UPROPERTY(BlueprintReadWrite)
+    TSoftObjectPtr<UMaterialInterface> CapMaterial;  // material to apply to the cap
+    UPROPERTY(BlueprintReadWrite)
+    TSoftObjectPtr<UMaterialInterface> FadeRingMaterial;  // material to apply to the fadering ** optional and tbd since we already get it from InferMaterialFromPositions()** 
+    
 };
 

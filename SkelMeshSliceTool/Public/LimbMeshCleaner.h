@@ -14,7 +14,6 @@ public:
         float WeldThreshold = 0.01f,
         int32 ValenceThreshold = 10, bool RunDiagnostic = false);
 
-private:
     static void WeldVertices(
         TArray<FVector3f>& Vertices,
         TArray<FIntVector>& Triangles,
